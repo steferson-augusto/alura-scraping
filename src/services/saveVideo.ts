@@ -2,6 +2,8 @@ import ora, { Ora } from 'ora'
 import retry from 'async-retry'
 const converter = require('node-m3u8-to-mp4')
 
+import message from '../utils/message'
+
 export default async function saveVideo(
   link: string,
   path: string,
@@ -24,6 +26,7 @@ export default async function saveVideo(
     }
   } catch (error) {
     spinner.fail('Falha ao baixar vídeo')
+    message.warn(error)
     throw new Error('Falha ao baixar vídeo') 
   }
 }
