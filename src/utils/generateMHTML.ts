@@ -1,19 +1,36 @@
 import fs from 'fs'
-import { Page } from "puppeteer"
+import { Page } from 'puppeteer'
+import retry from 'async-retry'
+import ora, { Ora } from 'ora'
 
-import createFolder from "./createFolder"
-import message from './message'
+import createFolder from './createFolder'
 
-export default async function generateMHTML(page: Page, path: string, name: string = 'index') {
+export default async function generateMHTML(
+  page: Page,
+  path: string,
+  name: string = 'index',
+  loader: Ora | undefined = undefined
+) {
+  const spinner: Ora = loader ?? ora('Verificando pastas...').start()
   try {
-    createFolder(path)
-
-    const cdp = await page.target().createCDPSession()
-    await cdp.send('Page.enable')
-    const { data } = await cdp.send('Page.captureSnapshot', { format: 'mhtml' })
-  
-    fs.writeFileSync(`${path}/${name}.mhtml`, data)
+    await retry(async (_bail, attempt) => {
+      try {
+        const textAttempt = attempt > 1 ? ` (tentativa ${attempt}/3)` : ''
+        createFolder(path)
+        spinner.text = 'Extraindo HTML...' + textAttempt
+        const cdp = await page.target().createCDPSession()
+        await cdp.send('Page.enable')
+        const { data } = await cdp.send('Page.captureSnapshot', { format: 'mhtml' })
+      
+        spinner.text = 'Salvando HTML...' + textAttempt
+        fs.writeFileSync(`${path}/${name}.mhtml`, data)
+        spinner.succeed('HTML salvo com sucesso')
+      } catch (error) {
+        throw new Error('Falha ao gerar MHTML')
+      }
+    }, { retries: 3 })
   } catch (error) {
-    message.error('Falha ao gerar MHTML')
+    spinner.fail('Falha ao gerar HTML')
+    throw new Error('Falha ao gerar HTML')    
   }
 }
