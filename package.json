@@ -8,6 +8,7 @@
     "server": "json-server --watch cursos.json"
   },
   "dependencies": {
+    "async-retry": "^1.3.1",
     "axios": "^0.21.1",
     "dotenv": "^8.2.0",
     "json-server": "^0.16.3",
@@ -17,5 +18,8 @@
     "puppeteer": "^7.1.0",
     "ts-node": "^9.1.1",
     "typescript": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/async-retry": "^1.4.2"
   }
 }
