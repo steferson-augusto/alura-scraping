@@ -1,5 +1,7 @@
 import axios from "axios"
 import { Page } from "puppeteer"
+import ora from "ora"
+
 import format from '../utils/format'
 import generateMHTML from '../utils/generateMHTML'
 import message from "../utils/message"
@@ -12,7 +14,7 @@ export interface Post {
   folder: string
 }
 
-export interface Aula {
+interface Aula {
   titulo: string
   url: string
   folder: string
@@ -27,16 +29,28 @@ async function fillAulas(aulas: Aula[]) {
   }
 }
 
+const getTitle = (path: string): string => {
+  const list = path.split('/')
+  list.splice(0, 2)
+  const [secao, formacao, passo] = list
+  return `⚪ ${secao}\n   ⚫ ${formacao}\n      ⬜ ${passo}`
+}
+
 // função para acessar todos elementos de curso
 export default async function getAulas(page: Page) {
-  try {
-    let count = 0
-    for (const post of posts) {
-      count = count + 1
-      console.clear()
-      console.log(post.titulo)
-      const percent = `${count / posts.length * 100}`
-      message.success(`Concluídos: ${count}/${posts.length} - ${parseFloat(percent).toFixed(2)}%`)
+  let count = 0
+  for (const post of posts) {
+    count = count + 1
+    console.clear()
+    const percent = `${count / posts.length * 100}`
+    message.success(`Concluídos: ${count}/${posts.length} - ${parseFloat(percent).toFixed(2)}%`)
+    const title = getTitle(post.folder)
+    console.log(title)
+
+    const spinner = ora('Extraindo dados...')
+    spinner.prefixText = '            '
+    spinner.start()
+    try {
       if (post.curso) {
         const path = `${post.folder}/${format(post.titulo)}`
         await page.goto(post.url, { waitUntil: 'networkidle0' })
@@ -46,21 +60,30 @@ export default async function getAulas(page: Page) {
           const aulas = list.map((aula, index) => {
             const element = aula.querySelector<HTMLDivElement>('.courseSectionList-sectionTitle')
             const titulo = `${index + 1} - ${element?.innerText ?? 'error'}`
+            const folder = `${path}/${titulo.replace(/[\\|:?/.*"<>]/g, '')}`
 
-            return { titulo , url: aula.href, folder: path }
+            return { titulo , url: aula.href, folder }
           })
 
           return aulas
         }, path)
-        
+
+        spinner.text ='Baixando HTML...'
         await generateMHTML(page, path)
+        spinner.succeed('HTML extraído com sucesso')
+
+        spinner.color = 'blue'
+        spinner.start('Salvando dados...')
         await fillAulas(aulas)
+        spinner.succeed('Dados salvos com sucesso')
       } else {
+        spinner.text ='Baixando HTML...'
         await page.goto(post.url, { waitUntil: 'networkidle0' })
         await generateMHTML(page, post.folder, format(post.titulo))
+        spinner.succeed('HTML extraído com sucesso')
       }
+    } catch (error) {
+      spinner.fail('Falha ao obter/salvar aulas')
     }
-  } catch (error) {
-    console.error(JSON.stringify(error, null, 2))
   }
 }
