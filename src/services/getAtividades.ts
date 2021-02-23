@@ -1,12 +1,13 @@
-import { HTTPResponse, Page } from "puppeteer"
-const converter = require('node-m3u8-to-mp4')
+import { HTTPResponse, Page } from 'puppeteer'
 import ora from 'ora'
+import retry from 'async-retry'
 
-import format from "../utils/format"
-import generateMHTML from "../utils/generateMHTML"
-import message from "../utils/message"
+import format from '../utils/format'
+import generateMHTML from '../utils/generateMHTML'
+import message from '../utils/message'
 import { aulas } from '../../cursos.json'
-// import { Aula } from "./getAulas"
+import login from './login'
+import saveVideo from './saveVideo'
 
 interface Atividade {
   titulo: string
@@ -17,16 +18,15 @@ interface Atividade {
 const getTitle = (path: string): string => {
   const list = path.split('/')
   list.splice(0, 2)
-  const [secao, formacao, passo, curso] = list
-  return `⚪ ${secao}\n   ⚫ ${formacao}\n      ⬜ ${passo}\n         ⬛ ${curso}`
+  const [secao, formacao, passo, curso, aula] = list
+  return `⚪ ${secao}\n   ⚫ ${formacao}\n      ⬜ ${passo}\n         ⬛ ${curso}\n            ${aula}`
 }
-
 
 // função para salvar html e vídeo na pasta ./data
 const getPage = async (page: Page, atividade: Atividade, path: string) => {
-  console.log(`\t\t\t${atividade.titulo}`)
-  const spinner = ora('Baixando HTML...')
-  spinner.prefixText = '            '
+  console.log(`               ${atividade.titulo}`)
+  const spinner = ora('Extraindo dados...')
+  spinner.prefixText = '                  '
   spinner.start()
   try {
     let link = ''
@@ -39,35 +39,50 @@ const getPage = async (page: Page, atividade: Atividade, path: string) => {
       }
     })
 
-    await page.goto(atividade.url, { waitUntil: 'networkidle0' })
-    
-    await generateMHTML(page, path, format(atividade.titulo))
-    spinner.succeed('HTML extraído com sucesso')
+    const loggedIn = await retry(async () => {
+      // if anything throws, we retry
+      await page.goto(atividade.url, { waitUntil: 'networkidle0' })
 
-    if (link) {
-      spinner.color = 'yellow'
-      spinner.start('Baixando vídeo...')
-  
-      await converter(link, `${path}/${format(atividade.titulo)}.mp4`)
-  
-      spinner.succeed('Vídeo baixado com sucesso')
+      const loggedIn = await page.evaluate(() => {
+        const user = document.querySelector<HTMLSpanElement>('.task-menu-footer-detalhes-nome')?.innerText
+        return user === 'Cristhian Elson Pereira Macedo'
+      })
+     
+      if (!loggedIn) {
+        // retry se usuário não estiver logado
+        await login(page, '               ')
+        throw new Error('Usuário não logado')
+      }
+
+      return loggedIn
+    }, {
+      retries: 3
+    })
+    
+    if (!loggedIn) {
+      spinner.fail('Usuário não logado')
+      throw new Error('Usuário não logado')
     }
     
+    await generateMHTML(page, path, format(atividade.titulo), spinner)
+    await saveVideo(link, `${path}/${format(atividade.titulo)}`, spinner)
+
   } catch (error) {
     spinner.fail('Falha ao extrair conteúdo da página')
+    throw new Error('Falha ao extrair conteúdo da página')    
   }
 }
 
 // função para acessar todos elementos de atividades
-export default async function getAtividades(page: Page) {
+export default async function getAtividades(page: Page, start: number = 0) {
   let count = 0
-  const aula = aulas[0]
-  // for (const aula of (aulas as Aula[])) {
+  const list = start > 0 ? aulas.slice(start) : aulas
+  for (const aula of list) {
     try {
       count = count + 1
       console.clear()
-      const percent = `${count / aulas.length * 100}`
-      message.success(`Concluídos: ${count}/${aulas.length} - ${parseFloat(percent).toFixed(2)}%`)
+      const percent = `${count / list.length * 100}`
+      message.success(`Concluídos: ${count}/${list.length} - ${parseFloat(percent).toFixed(2)}%`)
       const title = getTitle(aula.folder)
       console.log(title)
 
@@ -91,6 +106,7 @@ export default async function getAtividades(page: Page) {
       
     } catch (error) {
       message.error('Falha ao obter aula')
+      throw new Error('Falha ao obter aula')      
     }
-  // }
+  }
 }
