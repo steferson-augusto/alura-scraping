@@ -35,7 +35,7 @@ const getPage = async (page: Page, atividade: Atividade, path: string) => {
       const request = response.request()
       if (request.url().endsWith('/video')){
         const data = await response.json()
-        link = data[0].link
+        link = data?.[0]?.link ?? ''
       }
     })
 
@@ -77,8 +77,11 @@ const getPage = async (page: Page, atividade: Atividade, path: string) => {
 export default async function getAtividades(page: Page, start: number = 0) {
   let count = 0
   const list = start > 0 ? aulas.slice(start) : aulas
+  const spinner = ora('Extraindo dados...')
+  spinner.prefixText = '               '
   for (const aula of list) {
     try {
+      spinner.start()
       count = count + 1
       console.clear()
       const percent = `${count / list.length * 100}`
@@ -100,12 +103,13 @@ export default async function getAtividades(page: Page, start: number = 0) {
         return atividades
       })
 
+      spinner.stop()
       for (const atividade of atividades) {
         await getPage(page, atividade, aula.folder)
       }
       
     } catch (error) {
-      message.error('Falha ao obter aula')
+      message.warn(error)
       throw new Error('Falha ao obter aula')      
     }
   }

@@ -4,6 +4,7 @@ import retry from 'async-retry'
 import ora, { Ora } from 'ora'
 
 import createFolder from './createFolder'
+import message from './message'
 
 export default async function generateMHTML(
   page: Page,
@@ -14,6 +15,7 @@ export default async function generateMHTML(
   const spinner: Ora = loader ?? ora('Verificando pastas...').start()
   try {
     await retry(async (_bail, attempt) => {
+      spinner.start('Verificando pastas...')
       try {
         const textAttempt = attempt > 1 ? ` (tentativa ${attempt}/3)` : ''
         createFolder(path)
@@ -31,6 +33,7 @@ export default async function generateMHTML(
     }, { retries: 3 })
   } catch (error) {
     spinner.fail('Falha ao gerar HTML')
+    message.warn(error)
     throw new Error('Falha ao gerar HTML')    
   }
 }
