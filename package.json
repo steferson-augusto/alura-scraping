@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "nodemon --watch \"src\" --exec \"ts-node src/index.ts\" -e ts",
+    "extract": "ts-node src/index.ts",
     "dev": "json-server --watch db.json",
     "server": "json-server --watch cursos.json"
   },
