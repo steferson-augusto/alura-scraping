@@ -14,7 +14,8 @@ export default async function login(page: Page, prefix: string = '') {
   
     await page.click('.btn-login')
   
-    await page.waitForSelector('.profile-info-name')
+    // await page.waitForSelector('.profile-info-name')
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded' })
     
     spinner.succeed('Login realizado com sucesso')
   } catch (error) {
