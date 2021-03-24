@@ -45,7 +45,7 @@ const getPage = async (page: Page, atividade: Atividade, path: string) => {
 
       const loggedIn = await page.evaluate(() => {
         const user = document.querySelector<HTMLSpanElement>('.task-menu-footer-detalhes-nome')?.innerText
-        return user === 'Cristhian Elson Pereira Macedo'
+        return user === 'lindicell'
       })
      
       if (!loggedIn) {
@@ -75,17 +75,16 @@ const getPage = async (page: Page, atividade: Atividade, path: string) => {
 
 // função para acessar todos elementos de atividades
 export default async function getAtividades(page: Page, start: number = 0) {
-  let count = 0
+  let count = start
   const list = start > 0 ? aulas.slice(start) : aulas
   const spinner = ora('Extraindo dados...')
   spinner.prefixText = '               '
   for (const aula of list) {
     try {
       spinner.start()
-      count = count + 1
       console.clear()
-      const percent = `${count / list.length * 100}`
-      message.success(`Concluídos: ${count}/${list.length} - ${parseFloat(percent).toFixed(2)}%`)
+      const percent = `${count / aulas.length * 100}`
+      message.success(`Concluídos: ${count}/${aulas.length} - ${parseFloat(percent).toFixed(2)}%`)
       const title = getTitle(aula.folder)
       console.log(title)
 
@@ -108,6 +107,7 @@ export default async function getAtividades(page: Page, start: number = 0) {
         await getPage(page, atividade, aula.folder)
       }
       
+      count = count + 1
     } catch (error) {
       message.warn(error)
       throw new Error('Falha ao obter aula')      
